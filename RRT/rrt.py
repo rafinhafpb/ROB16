@@ -11,9 +11,10 @@ import math
 import numpy as np
 import plotting, utils
 import env
+import matplotlib.pyplot as plt
 
 # parameters
-showAnimation = True
+showAnimation = False
 
 class Node:
     def __init__(self, n):
@@ -23,13 +24,14 @@ class Node:
 
 
 class Rrt:
-    def __init__(self, environment, s_start, s_goal, step_len, goal_sample_rate, iter_max):
+    def __init__(self, environment, s_start, s_goal, step_len, goal_sample_rate, corner_sample_rate, iter_max):
         self.s_start = Node(s_start)
         self.s_goal = Node(s_goal)
         self.step_len = step_len
         self.goal_sample_rate = goal_sample_rate
         self.iter_max = iter_max
         self.vertex = [self.s_start]
+        self.corner_sample_rate = corner_sample_rate
 
         self.env = environment
         if showAnimation:
@@ -45,7 +47,7 @@ class Rrt:
     def planning(self):
         iter_goal = None
         for i in range(self.iter_max):
-            node_rand = self.generate_random_node(self.goal_sample_rate)
+            node_rand = self.generate_random_node(self.goal_sample_rate, self.corner_sample_rate)
             node_near = self.nearest_neighbor(self.vertex, node_rand)
             node_new = self.new_state(node_near, node_rand)
 
@@ -63,11 +65,19 @@ class Rrt:
         else:
             return self.extract_path(node_goal), iter_goal
 
-    def generate_random_node(self, goal_sample_rate):
+    def generate_random_node(self, goal_sample_rate, corner_sample_rate):
+        delta = self.utils.delta
+        
+        if np.random.random() < corner_sample_rate:
+            obs_rectangle = self.env.obs_rectangle[np.random.randint(0, len(self.env.obs_rectangle))]
+            obs_corner = Node((obs_rectangle[0], obs_rectangle[1]))
+            corner_node = Node((obs_corner.x + self.step_len, obs_corner.y + self.step_len))
+            while self.utils.is_inside_obs(corner_node):
+                corner_node = self.rotate_node(obs_corner, corner_node, math.pi/6)
+            return corner_node
+
         if np.random.random() < goal_sample_rate:
             return self.s_goal
-
-        delta = self.utils.delta
 
         return Node((np.random.uniform(self.x_range[0] + delta, self.x_range[1] - delta),
                     np.random.uniform(self.y_range[0] + delta, self.y_range[1] - delta)))
@@ -97,6 +107,14 @@ class Rrt:
             path.append((node_now.x, node_now.y))
 
         return path
+    
+    @staticmethod
+    def rotate_node(node_start, node_end, angle):
+        dx = node_end.x - node_start.x
+        dy = node_end.y - node_start.y
+        rotated_dx = dx * math.cos(angle) - dy * math.sin(angle)
+        rotated_dy = dx * math.sin(angle) + dy * math.cos(angle)
+        return Node((node_start.x + rotated_dx, node_start.y + rotated_dy))
 
     @staticmethod
     def get_distance_and_angle(node_start, node_end):
@@ -118,21 +136,38 @@ def get_path_length(path):
 def main():
     x_start=(2, 2)  # Starting node
     x_goal=(49, 24)  # Goal node
-    environment = env.Env()
+    environment = env.Env2()
+    max_iter = 1500
+    corner_sample_rates = np.linspace(0, 1, num=11)
+    success_rate = [[] for _ in range(len(corner_sample_rates))]
 
-    rrt = Rrt(environment, x_start, x_goal, 2, 0.10, 1500)
-    path, nb_iter = rrt.planning()
+    for index, corner_sample_rate in enumerate(corner_sample_rates):
+        for _ in range(20):
+            rrt = Rrt(environment, x_start, x_goal, 2, 0.10, corner_sample_rate, max_iter)
+            path, nb_iter = rrt.planning()
 
-    if path:
-        print('Found path in ' + str(nb_iter) + ' iterations, length : ' + str(get_path_length(path)))
-        if showAnimation:
-            rrt.plotting.animation(rrt.vertex, path, "RRT", True)
-            plotting.plt.show()
-    else:
-        print("No Path Found in " + str(nb_iter) + " iterations!")
-        if showAnimation:
-            rrt.plotting.animation(rrt.vertex, [], "RRT", True)
-            plotting.plt.show()
+            if path:
+                success_rate[index].append(1)
+                if showAnimation:
+                    print('Found path in ' + str(nb_iter) + ' iterations, length : ' + str(get_path_length(path)))
+                    rrt.plotting.animation(rrt.vertex, path, "RRT", True)
+                    plotting.plt.show()
+            else:
+                success_rate[index].append(0)
+                if showAnimation:
+                    print("No Path Found in " + str(nb_iter) + " iterations!")
+                    rrt.plotting.animation(rrt.vertex, [], "RRT", True)
+                    plotting.plt.show()
+
+    success_rate = [[np.count_nonzero(success_rate[i])/len(success_rate[i])] for i in range(len(success_rate))]
+
+    plt.plot(corner_sample_rates, success_rate, 'o-b')
+    plt.xlabel("Sample rate for corner points")
+    plt.ylabel("Success Rate (%)")
+    plt.title("Performance variation by sample rate using OBRRT strategy")
+    plt.grid(True)
+    plt.show()
+    
 
 if __name__ == '__main__':
     main()

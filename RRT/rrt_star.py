@@ -206,7 +206,7 @@ def main():
     x_goal = (49, 24)  # Goal node
     environment = env.Env()
 
-    rrt_star = RrtStar(environment, x_start, x_goal, 2, 0.10, 20, 1500)
+    rrt_star = RrtStar(environment, x_start, x_goal, 1, 0.10, 20, 1500)
     path, nb_iter = rrt_star.planning()
 
     if path:
