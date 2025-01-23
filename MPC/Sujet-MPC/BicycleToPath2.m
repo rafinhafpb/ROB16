@@ -1,10 +1,8 @@
-function BicycleToPath
+function BicycleToPath2
 % Display Bicycle Control Behavior while following a path
 
 % Path and starting position
 Path = [.1,0,0; 4,0,0; 4,4,0; 3.5,1,0; 0,4,0;0,1,-1.57]';
-%numPoints = 3; % Number of interpolated points between each pair of waypoints
-%PathSmooth = InterpolatePath(Path, numPoints);
 xTrue = [0;0;0];
 
 %Storage for position and errors
@@ -13,12 +11,12 @@ XErrStore = zeros(3,20000);
 k=1;
 
 % loop until goal reached or max time
-while max(abs(dist(xTrue(1:2,1),Path(1:2,end))))>.005 && k<30000
+while max(abs(dist(xTrue(1:2,1),Path(1:2,end))))>.005 && k<20000 %20000
     % Compute Control
-    u=BicycleToPathControl(xTrue,Path);
+    u=BicycleToPathControl2(xTrue,Path);
 
     % Simulate Vehicle motion
-    [xTrue,u] = SimulateBicycle(xTrue,u);
+    [xTrue,u] = SimulateBicycle2(xTrue,u);
 
     k=k+1;
     %store results:
@@ -48,5 +46,4 @@ ylabel('\phi');xlabel('time');
 
 disp(['Total error : ',num2str(sum(XErrStore(1,:)))]);
 
-end
 
